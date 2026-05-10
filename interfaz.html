@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoMonitor — Panel de Administración</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f2eb;
+    --sidebar: #1a2e1a;
+    --sidebar-hover: #2a4a2a;
+    --accent: #4a7c59;
+    --accent2: #c8a951;
+    --danger: #c0392b;
+    --text: #1e1e1e;
+    --muted: #6b7280;
+    --border: #d4cfc5;
+    --white: #fffef9;
+    --card: #fffef9;
+    --tag-vu: #fef3c7; --tag-vu-t: #92400e;
+    --tag-en: #fee2e2; --tag-en-t: #991b1b;
+    --tag-cr: #fecaca; --tag-cr-t: #7f1d1d;
+    --tag-lc: #d1fae5; --tag-lc-t: #065f46;
+    --tag-nt: #e0f2fe; --tag-nt-t: #0369a1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; font-size: 13px; }
+
+  /* SIDEBAR */
+  #sidebar { width: 220px; background: var(--sidebar); display: flex; flex-direction: column; flex-shrink: 0; }
+  #sidebar .logo { padding: 24px 20px; border-bottom: 1px solid #2a4a2a; }
+  #sidebar .logo-icon { color: #6ab87a; font-size: 22px; }
+  #sidebar .logo-title { font-family: 'Fraunces', serif; font-size: 17px; color: #e8f5e9; font-weight: 600; margin-top: 6px; line-height: 1.2; }
+  #sidebar .logo-sub { color: #4a7c59; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+  #sidebar nav { flex: 1; padding: 16px 12px; overflow-y: auto; }
+  .nav-btn { width: 100%; text-align: left; background: none; border: none; cursor: pointer; color: #a7c4a7; padding: 9px 12px; border-radius: 6px; font-family: 'DM Mono', monospace; font-size: 11.5px; display: flex; align-items: center; gap: 10px; transition: all 0.15s; margin-bottom: 2px; }
+  .nav-btn:hover { background: var(--sidebar-hover); color: #e8f5e9; }
+  .nav-btn.active { background: var(--accent); color: #fff; }
+  .nav-btn i { width: 16px; text-align: center; }
+  #sidebar .version { padding: 12px 20px; font-size: 10px; color: #3a5a3a; border-top: 1px solid #2a4a2a; }
+
+  /* MAIN */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #topbar { background: var(--white); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+  #topbar h1 { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; color: var(--text); }
+  #topbar .actions { display: flex; gap: 10px; align-items: center; }
+  .btn { padding: 7px 14px; border-radius: 6px; border: none; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #3a6347; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #a93226; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--bg); }
+  .btn-seed { background: var(--accent2); color: #1a1a00; }
+  .btn-seed:hover { background: #b8982a; }
+
+  /* CONTENT */
+  #content { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+  /* SEARCH */
+  .search-bar { position: relative; margin-bottom: 18px; }
+  .search-bar input { width: 280px; padding: 8px 12px 8px 34px; border: 1px solid var(--border); border-radius: 6px; background: var(--white); font-family: 'DM Mono', monospace; font-size: 12px; outline: none; }
+  .search-bar input:focus { border-color: var(--accent); }
+  .search-bar i { position: absolute; left: 11px; top: 10px; color: var(--muted); font-size: 12px; }
+
+  /* TABLE */
+  .table-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: #f0ede5; padding: 10px 14px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  tbody tr { border-bottom: 1px solid #ece9e0; transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #f8f5ee; }
+  tbody td { padding: 10px 14px; font-size: 12px; color: var(--text); }
+  td.actions { text-align: right; white-space: nowrap; }
+  .act-btn { background: none; border: none; cursor: pointer; padding: 4px 7px; border-radius: 4px; font-size: 12px; transition: all 0.1s; }
+  .act-btn.edit { color: #2563eb; } .act-btn.edit:hover { background: #eff6ff; }
+  .act-btn.del { color: var(--danger); } .act-btn.del:hover { background: #fef2f2; }
+  .tag { padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 500; display: inline-block; }
+  .tag-vu { background: var(--tag-vu); color: var(--tag-vu-t); }
+  .tag-en { background: var(--tag-en); color: var(--tag-en-t); }
+  .tag-cr { background: var(--tag-cr); color: var(--tag-cr-t); }
+  .tag-lc { background: var(--tag-lc); color: var(--tag-lc-t); }
+  .tag-nt { background: var(--tag-nt); color: var(--tag-nt-t); }
+  .tag-p1 { background: #fef9c3; color: #713f12; }
+  .tag-p2 { background: #fde8d8; color: #9a3412; }
+  .tag-p3 { background: #fee2e2; color: #991b1b; }
+  td.truncate-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .italic { font-style: italic; }
+  .empty-row td { text-align: center; padding: 32px; color: var(--muted); }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--white); border-radius: 12px; padding: 28px; width: 480px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .modal .method-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-bottom: 18px; }
+  .badge-post { background: #d1fae5; color: #065f46; }
+  .badge-put { background: #fef3c7; color: #92400e; }
+  .field-group { margin-bottom: 14px; }
+  .field-group label { display: block; font-size: 11px; font-weight: 500; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .field-group input, .field-group select, .field-group textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: 'DM Mono', monospace; font-size: 12px; background: var(--bg); outline: none; }
+  .field-group input:focus, .field-group select:focus, .field-group textarea:focus { border-color: var(--accent); background: var(--white); }
+  .field-group textarea { resize: vertical; min-height: 70px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+
+  /* TOAST */
+  #toast { position: fixed; bottom: 24px; right: 24px; background: #1a2e1a; color: #a7c4a7; padding: 10px 18px; border-radius: 8px; font-size: 12px; z-index: 999; opacity: 0; transform: translateY(10px); transition: all 0.25s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.error { background: #450a0a; color: #fca5a5; }
+
+  .view-section { display: none; }
+  .view-section.active { display: block; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="logo">
+    <div class="logo-icon"><i class="fa-solid fa-leaf"></i></div>
+    <div class="logo-title">EcoMonitor</div>
+    <div class="logo-sub">Admin Panel</div>
+  </div>
+  <nav>
+    <button class="nav-btn active" id="nav-areas"         onclick="switchView('areas')">        <i class="fa-solid fa-map"></i> Áreas ACHA</button>
+    <button class="nav-btn"        id="nav-biomas"        onclick="switchView('biomas')">       <i class="fa-solid fa-tree"></i> Catálogo Biomas</button>
+    <button class="nav-btn"        id="nav-especies"      onclick="switchView('especies')">     <i class="fa-solid fa-paw"></i> Especies</button>
+    <button class="nav-btn"        id="nav-imagenes"      onclick="switchView('imagenes')">     <i class="fa-solid fa-satellite"></i> Imágenes</button>
+    <button class="nav-btn"        id="nav-puntos"        onclick="switchView('puntos')">       <i class="fa-solid fa-location-dot"></i> Puntos Muestreo</button>
+    <button class="nav-btn"        id="nav-observaciones" onclick="switchView('observaciones')"><i class="fa-solid fa-eye"></i> Observaciones</button>
+    <button class="nav-btn"        id="nav-registros"     onclick="switchView('registros')">    <i class="fa-solid fa-clipboard-list"></i> Registros</button>
+  </nav>
+  <div class="version">v2.0.0 · Proyecto Final</div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="topbar">
+    <h1 id="header-title">Áreas ACHA</h1>
+    <div class="actions">
+      <button class="btn btn-seed" onclick="seedDB()"><i class="fa-solid fa-database"></i> Seed DB</button>
+      <button class="btn btn-primary" id="btn-new" onclick="openCreate()"><i class="fa-solid fa-plus"></i> Nuevo Registro</button>
+    </div>
+  </div>
+
+  <div id="content">
+    <div class="search-bar">
+      <i class="fa-solid fa-search"></i>
+      <input type="text" id="search-input" placeholder="Buscar en esta tabla..." oninput="filterTable()">
+    </div>
+
+    <!-- AREAS -->
+    <div id="view-areas" class="view-section active">
+      <div class="table-card">
+        <table><thead><tr>
+          <th>ID</th><th>Nombre</th><th>Geometría Poligonal</th><th>Prioridad</th><th style="text-align:right">Acciones</th>
+        </tr></thead><tbody id="tb-areas"></tbody></table>
+      </div>
+    </div>
+
+    <!-- BIOMAS -->
+    <div id="view-biomas" class="view-section">
+      <div class="table-card">
+        <table><thead><tr>
+          <th>ID</th><th>Nombre Clase</th><th>Descripción Ecológica</th><th style="text-align:right">Acciones</th>
+        </tr></thead><tbody id="tb-biomas"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ESPECIES -->
+    <div id="view-especies" class="view-section">
+      <div class="table-card">
+        <table><thead><tr>
+          <th>ID</th><th>Nombre Científico</th><th>Estado UICN</th><th style="text-align:right">Acciones</th>
+        </tr></thead><tbody id="tb-especies"></tbody></table>
+      </div>
+    </div>
+
+    <!-- IMAGENES -->
+    <div id="view-imagenes" class="view-section">
+      <div class="table-card">
+        <table><thead><tr>
+          <th>ID Producto</th><th>Fecha Adquisición</th><th>% Nubes</th><th>Sensor</th><th style="text-align:right">Acciones</th>
+        </tr></thead><tbody id="tb-imagenes"></tbody></table>
+      </div>
+    </div>
+
+    <!-- PUNTOS -->
+    <div id="view-puntos" class="view-section">
+      <div class="table-card">
+        <table><thead><tr>
+          <th>ID</th><th>Área ID</th><th>Latitud</th><th>Longitud</th><th>Altitud</th><th>Hash</th><th style="text-align:right">Acciones</th>
+        </tr></thead><tbody id="tb-puntos"></tbody></table>
+      </div>
+    </div>
+
+    <!-- OBSERVACIONES -->
+    <div id="view-observaciones" class="view-section">
+      <div class="table-card">
+        <table><thead><tr>
+          <th>ID</th><th>Punto</th><th>Imagen</th><th>NDVI</th><th>NDMI</th><th>BSI</th><th>Clase</th><th>Confianza</th><th style="text-align:right">Acciones</th>
+        </tr></thead><tbody id="tb-observaciones"></tbody></table>
+      </div>
+    </div>
+
+    <!-- REGISTROS -->
+    <div id="view-registros" class="view-section">
+      <div class="table-card">
+        <table><thead><tr>
+          <th>ID</th><th>Especie</th><th>Punto</th><th>Fecha</th><th>Cantidad</th><th>Notas Hábitat</th><th style="text-align:right">Acciones</th>
+        </tr></thead><tbody id="tb-registros"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal-box">
+    <h2 id="modal-title">Nuevo Registro</h2>
+    <span id="modal-badge" class="method-badge badge-post">POST</span>
+    <div id="modal-fields"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModalDirect()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRecord()"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+const API = 'http://localhost:8000';
+let currentView = 'areas';
+let editingId = null;
+let allRows = [];
+
+const VIEWS = {
+  areas:         { title: 'Áreas ACHA',           endpoint: '/areas-acha',                pk: 'id' },
+  biomas:        { title: 'Catálogo Biomas',       endpoint: '/catalogo-biomas',           pk: 'id' },
+  especies:      { title: 'Especies',              endpoint: '/especies',                  pk: 'id' },
+  imagenes:      { title: 'Catálogo Imágenes',     endpoint: '/catalogo-imagenes',         pk: 'id_producto' },
+  puntos:        { title: 'Puntos de Muestreo',    endpoint: '/puntos-muestreo',           pk: 'id' },
+  observaciones: { title: 'Observaciones Espectrales', endpoint: '/observaciones-espectrales', pk: 'id' },
+  registros:     { title: 'Registros de Monitoreo',endpoint: '/registros-monitoreo',       pk: 'id' },
+};
+
+// ── FIELD DEFINITIONS ─────────────────────────────────────────────────────────
+const FIELDS = {
+  areas: [
+    { id:'id',                   label:'ID',                  type:'number', required:true,  editDisabled:true },
+    { id:'nombre',               label:'Nombre',              type:'text',   required:true },
+    { id:'geometria_poligonal',  label:'Geometría Poligonal', type:'text',   placeholder:'POLYGON((0 0,1 0,1 1,0 0))' },
+    { id:'prioridad_muestreo',   label:'Prioridad (1-3)',      type:'number', min:1, max:3 },
+  ],
+  biomas: [
+    { id:'id',                   label:'ID',                  type:'number', required:true,  editDisabled:true },
+    { id:'nombre_clase',         label:'Nombre Clase',        type:'text',   required:true },
+    { id:'descripcion_ecologica',label:'Descripción Ecológica',type:'textarea' },
+  ],
+  especies: [
+    { id:'id',               label:'ID',               type:'number', required:true, editDisabled:true },
+    { id:'nombre_cientifico',label:'Nombre Científico', type:'text',   required:true },
+    { id:'estado_uicn',      label:'Estado UICN',       type:'select', options:['LC','NT','VU','EN','CR','EW','EX'] },
+  ],
+  imagenes: [
+    { id:'id_producto',      label:'ID Producto',       type:'text',   required:true, editDisabled:true, placeholder:'S2A_20240101_001' },
+    { id:'fecha_adquisicion',label:'Fecha Adquisición', type:'datetime-local', required:true },
+    { id:'porcentaje_nubes', label:'% Nubes',           type:'number', step:'0.01', min:0, max:100 },
+    { id:'sensor',           label:'Sensor',            type:'text',   placeholder:'Sentinel-2A' },
+  ],
+  puntos: [
+    { id:'id',           label:'ID',          type:'number', required:true, editDisabled:true },
+    { id:'area_id',      label:'Área ID',     type:'number' },
+    { id:'latitud',      label:'Latitud',     type:'number', step:'0.00000001', required:true },
+    { id:'longitud',     label:'Longitud',    type:'number', step:'0.00000001', required:true },
+    { id:'altitud',      label:'Altitud (m)', type:'number', step:'0.01' },
+    { id:'pixel_id_hash',label:'Pixel Hash',  type:'text' },
+  ],
+  observaciones: [
+    { id:'punto_id',            label:'Punto ID',            type:'number' },
+    { id:'imagen_id',           label:'Imagen ID',           type:'text',   placeholder:'S2A_20240115_001' },
+    { id:'b2_blue',  label:'B2 Blue',  type:'number' }, { id:'b3_green', label:'B3 Green', type:'number' },
+    { id:'b4_red',   label:'B4 Red',   type:'number' }, { id:'b8_nir',   label:'B8 NIR',   type:'number' },
+    { id:'b11_swir1',label:'B11 SWIR1',type:'number' }, { id:'b12_swir2',label:'B12 SWIR2',type:'number' },
+    { id:'ndvi',label:'NDVI',type:'number',step:'0.000001'},{id:'ndmi',label:'NDMI',type:'number',step:'0.000001'},
+    { id:'bsi', label:'BSI', type:'number',step:'0.000001'},
+    { id:'clase_id',            label:'Clase ID',            type:'number' },
+    { id:'es_verdad_campo',     label:'Verdad de Campo',     type:'select', options:['1','0'] },
+    { id:'confianza_prediccion',label:'Confianza (%)',        type:'number', step:'0.01', min:0, max:100 },
+  ],
+  registros: [
+    { id:'especie_id',       label:'Especie ID',      type:'number' },
+    { id:'punto_id',         label:'Punto ID',        type:'number' },
+    { id:'fecha_observacion',label:'Fecha Observación',type:'datetime-local' },
+    { id:'cantidad',         label:'Cantidad',         type:'number' },
+    { id:'notas_habitat',    label:'Notas Hábitat',    type:'textarea' },
+  ],
+};
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────────
+function switchView(view) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+  document.getElementById(`nav-${view}`).classList.add('active');
+  document.getElementById(`view-${view}`).classList.add('active');
+  document.getElementById('header-title').textContent = VIEWS[view].title;
+  document.getElementById('search-input').value = '';
+  currentView = view;
+  editingId = null;
+  fetchData(view);
+}
+
+// ── FETCH & RENDER ────────────────────────────────────────────────────────────
+async function fetchData(view) {
+  try {
+    const res = await fetch(API + VIEWS[view].endpoint);
+    if (!res.ok) throw new Error(res.statusText);
+    allRows = await res.json();
+    renderTable(view, allRows);
+  } catch(e) {
+    showToast('Error conectando con la API. ¿Está corriendo uvicorn?', true);
+  }
+}
+
+function renderTable(view, data) {
+  const tbody = document.getElementById(`tb-${view}`);
+  if (!data.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="10">Sin registros. Usa "Seed DB" para cargar datos de prueba.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(row => renderRow(view, row)).join('');
+}
+
+function uicnTag(code) {
+  const map = { LC:'lc', NT:'nt', VU:'vu', EN:'en', CR:'cr' };
+  const cls = map[code] || 'nt';
+  const labels = { LC:'LC · Preocupación Menor', NT:'NT · Casi Amenazada', VU:'VU · Vulnerable', EN:'EN · En Peligro', CR:'CR · Peligro Crítico' };
+  return `<span class="tag tag-${cls}">${labels[code]||code}</span>`;
+}
+function prioTag(p) {
+  const cls = ['','tag-p1','tag-p2','tag-p3'][p]||'';
+  return `<span class="tag ${cls}">P${p}</span>`;
+}
+function fmtDate(d) { return d ? new Date(d).toLocaleDateString('es-EC') : '—'; }
+function fmtDT(d)   { return d ? new Date(d).toLocaleString('es-EC',{dateStyle:'short',timeStyle:'short'}) : '—'; }
+function esc(v)     { return String(v??'').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
+
+function actionBtns(view, id) {
+  const pk = esc(id);
+  return `<td class="actions">
+    <button class="act-btn edit" onclick="openEdit('${view}','${pk}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
+    <button class="act-btn del"  onclick="deleteRecord('${view}','${pk}')" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+  </td>`;
+}
+
+function renderRow(view, r) {
+  if (view==='areas') return `<tr>
+    <td>${r.id}</td><td>${r.nombre??'—'}</td>
+    <td class="truncate-cell">${r.geometria_poligonal??'—'}</td>
+    <td>${prioTag(r.prioridad_muestreo)}</td>${actionBtns(view,r.id)}</tr>`;
+
+  if (view==='biomas') return `<tr>
+    <td>${r.id}</td><td>${r.nombre_clase??'—'}</td>
+    <td class="truncate-cell">${r.descripcion_ecologica??'—'}</td>${actionBtns(view,r.id)}</tr>`;
+
+  if (view==='especies') return `<tr>
+    <td>${r.id}</td><td class="italic">${r.nombre_cientifico??'—'}</td>
+    <td>${uicnTag(r.estado_uicn)}</td>${actionBtns(view,r.id)}</tr>`;
+
+  if (view==='imagenes') return `<tr>
+    <td style="font-size:11px">${r.id_producto}</td><td>${fmtDate(r.fecha_adquisicion)}</td>
+    <td>${r.porcentaje_nubes??0}%</td><td>${r.sensor??'—'}</td>${actionBtns(view,r.id_producto)}</tr>`;
+
+  if (view==='puntos') return `<tr>
+    <td>${r.id}</td><td>${r.area_id??'—'}</td><td>${r.latitud}</td><td>${r.longitud}</td>
+    <td>${r.altitud??'—'}m</td><td class="truncate-cell" style="max-width:100px;font-size:10px">${r.pixel_id_hash??'—'}</td>
+    ${actionBtns(view,r.id)}</tr>`;
+
+  if (view==='observaciones') return `<tr>
+    <td>${r.id}</td><td>Pt.${r.punto_id??'—'}</td><td style="font-size:10px">${r.imagen_id??'—'}</td>
+    <td>${r.ndvi??'—'}</td><td>${r.ndmi??'—'}</td><td>${r.bsi??'—'}</td>
+    <td>${r.clase_id??'—'}</td><td>${r.confianza_prediccion??'—'}%</td>${actionBtns(view,r.id)}</tr>`;
+
+  if (view==='registros') return `<tr>
+    <td>${r.id}</td><td>Esp.${r.especie_id??'—'}</td><td>Pt.${r.punto_id??'—'}</td>
+    <td>${fmtDT(r.fecha_observacion)}</td><td>${r.cantidad??'—'}</td>
+    <td class="truncate-cell">${r.notas_habitat??'—'}</td>${actionBtns(view,r.id)}</tr>`;
+
+  return '';
+}
+
+// ── SEARCH ─────────────────────────────────────────────────────────────────────
+function filterTable() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const filtered = allRows.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+  renderTable(currentView, filtered);
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function buildFields(view, data={}) {
+  const isEdit = !!editingId;
+  return FIELDS[view].map(f => {
+    const val = data[f.id] ?? '';
+    const disabled = isEdit && f.editDisabled ? 'disabled style="opacity:0.5"' : '';
+    let input = '';
+    if (f.type === 'select') {
+      const opts = f.options.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('');
+      input = `<select id="f-${f.id}" ${disabled}>${opts}</select>`;
+    } else if (f.type === 'textarea') {
+      input = `<textarea id="f-${f.id}" rows="3" ${disabled}>${esc(val)}</textarea>`;
+    } else if (f.type === 'datetime-local') {
+      // Convert ISO string to datetime-local format
+      let dtval = val ? val.replace(' ','T').substring(0,16) : '';
+      input = `<input type="datetime-local" id="f-${f.id}" value="${dtval}" ${disabled}>`;
+    } else {
+      const extra = f.step ? `step="${f.step}"` : '';
+      const minmax = (f.min!=null?`min="${f.min}"`:'') + (f.max!=null?` max="${f.max}"`:'');
+      const ph = f.placeholder ? `placeholder="${f.placeholder}"` : '';
+      input = `<input type="${f.type}" id="f-${f.id}" value="${esc(val)}" ${extra} ${minmax} ${ph} ${disabled}>`;
+    }
+    return `<div class="field-group"><label>${f.label}${f.required?'<span style="color:red"> *</span>':''}</label>${input}</div>`;
+  }).join('');
+}
+
+function openCreate() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = `Nuevo — ${VIEWS[currentView].title}`;
+  document.getElementById('modal-badge').textContent = 'POST';
+  document.getElementById('modal-badge').className = 'method-badge badge-post';
+  document.getElementById('modal-fields').innerHTML = buildFields(currentView);
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+async function openEdit(view, id) {
+  currentView = view;
+  editingId = id;
+  try {
+    const res = await fetch(`${API}${VIEWS[view].endpoint}/${id}`);
+    const data = await res.json();
+    document.getElementById('modal-title').textContent = `Editar — ${VIEWS[view].title}`;
+    document.getElementById('modal-badge').textContent = 'PUT';
+    document.getElementById('modal-badge').className = 'method-badge badge-put';
+    document.getElementById('modal-fields').innerHTML = buildFields(view, data);
+    document.getElementById('modal-overlay').classList.add('open');
+  } catch(e) { showToast('Error cargando registro', true); }
+}
+
+function closeModal(e) { if (e.target === document.getElementById('modal-overlay')) closeModalDirect(); }
+function closeModalDirect() { document.getElementById('modal-overlay').classList.remove('open'); editingId = null; }
+
+async function saveRecord() {
+  const view = currentView;
+  const payload = {};
+  for (const f of FIELDS[view]) {
+    const el = document.getElementById(`f-${f.id}`);
+    if (!el) continue;
+    let val = el.value.trim();
+    if (val === '') continue;
+    // type coercion
+    if (f.type === 'number') val = f.step ? parseFloat(val) : parseInt(val);
+    else if (f.type === 'datetime-local') val = val.replace('T',' ') + ':00';
+    payload[f.id] = val;
+  }
+
+  const isEdit = !!editingId;
+  const pk = VIEWS[view].pk;
+  const url = isEdit ? `${API}${VIEWS[view].endpoint}/${editingId}` : `${API}${VIEWS[view].endpoint}`;
+  const method = isEdit ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    if (res.ok || res.status === 201) {
+      showToast(isEdit ? '✓ Registro actualizado' : '✓ Registro creado');
+      closeModalDirect();
+      fetchData(view);
+    } else {
+      const err = await res.json();
+      showToast(`Error: ${err.detail||res.statusText}`, true);
+    }
+  } catch(e) { showToast('Error de red', true); }
+}
+
+// ── DELETE ────────────────────────────────────────────────────────────────────
+async function deleteRecord(view, id) {
+  if (!confirm(`¿Eliminar el registro "${id}" permanentemente?\nEsta acción no se puede deshacer.`)) return;
+  try {
+    const res = await fetch(`${API}${VIEWS[view].endpoint}/${id}`, { method: 'DELETE' });
+    if (res.ok || res.status === 204) {
+      showToast('✓ Registro eliminado');
+      fetchData(view);
+    } else {
+      const err = await res.json();
+      showToast(`Error: ${err.detail||res.statusText}`, true);
+    }
+  } catch(e) { showToast('Error de red', true); }
+}
+
+// ── SEED ──────────────────────────────────────────────────────────────────────
+async function seedDB() {
+  if (!confirm('¿Cargar datos de demostración en todas las tablas?\n(Los duplicados se omiten automáticamente.)')) return;
+  showToast('Cargando seed data...');
+  try {
+    const res = await fetch(`${API}/seed`, { method: 'POST' });
+    const data = await res.json();
+    const counts = Object.entries(data.inserted).map(([k,v])=>`${k}: ${v}`).join(' | ');
+    showToast(`✓ Seed completo — ${counts}`);
+    fetchData(currentView);
+  } catch(e) { showToast('Error ejecutando seed', true); }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = '', 3500);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+window.onload = () => switchView('areas');
+</script>
+</body>
+</html>
