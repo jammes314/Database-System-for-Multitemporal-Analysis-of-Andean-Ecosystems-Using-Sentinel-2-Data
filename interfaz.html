@@ -486,9 +486,155 @@ async function saveRecord() {
   } catch(e) { showToast('Error de red', true); }
 }
 
-// ── DELETE ────────────────────────────────────────────────────────────────────
-async function deleteRecord(view, id) {
-  if (!confirm(`¿Eliminar el registro "${id}" permanentemente?\nEsta acción no se puede deshacer.`)) return;
+// ── DELETE — with SQL hierarchy warning modal ─────────────────────────────────
+
+const DEL_INFO = {
+  areas: {
+    role: 'TABLA PADRE', isParent: true,
+    label: 'Área ACHA',
+    impactBg: '#fef2f2', impactBorder: '#ef4444', impactText: '#991b1b',
+    impactHead: '⚠️ Eliminación en cascada — se borrarán también:',
+    impacts: [
+      'Puntos de Muestreo  (area_id)',
+      'Observaciones Espectrales  (a través de los puntos)',
+      'Registros de Monitoreo  (a través de los puntos)',
+    ],
+    tree: `🗑 areas_acha  ← este registro
+  └── 🗑 puntos_muestreo  (area_id)
+        ├── 🗑 observaciones_espectrales  (punto_id)
+        └── 🗑 registros_monitoreo  (punto_id)`,
+    btnColor: '#dc2626', btnLabel: 'Sí, eliminar todo'
+  },
+  biomas: {
+    role: 'TABLA PADRE', isParent: true,
+    label: 'Catálogo Bioma',
+    impactBg: '#fef2f2', impactBorder: '#ef4444', impactText: '#991b1b',
+    impactHead: '⚠️ Eliminación en cascada — se borrarán también:',
+    impacts: ['Observaciones Espectrales  (clase_id)'],
+    tree: `🗑 catalogo_biomas  ← este registro
+  └── 🗑 observaciones_espectrales  (clase_id)`,
+    btnColor: '#dc2626', btnLabel: 'Sí, eliminar todo'
+  },
+  especies: {
+    role: 'TABLA PADRE', isParent: true,
+    label: 'Especie',
+    impactBg: '#fef2f2', impactBorder: '#ef4444', impactText: '#991b1b',
+    impactHead: '⚠️ Eliminación en cascada — se borrarán también:',
+    impacts: ['Registros de Monitoreo  (especie_id)'],
+    tree: `🗑 especies  ← este registro
+  └── 🗑 registros_monitoreo  (especie_id)`,
+    btnColor: '#dc2626', btnLabel: 'Sí, eliminar todo'
+  },
+  imagenes: {
+    role: 'TABLA PADRE', isParent: true,
+    label: 'Imagen de Catálogo',
+    impactBg: '#fef2f2', impactBorder: '#ef4444', impactText: '#991b1b',
+    impactHead: '⚠️ Eliminación en cascada — se borrarán también:',
+    impacts: ['Observaciones Espectrales  (imagen_id)'],
+    tree: `🗑 catalogo_imagenes  ← este registro
+  └── 🗑 observaciones_espectrales  (imagen_id)`,
+    btnColor: '#dc2626', btnLabel: 'Sí, eliminar todo'
+  },
+  puntos: {
+    role: 'PADRE e HIJO', isParent: true,
+    label: 'Punto de Muestreo',
+    impactBg: '#fff7ed', impactBorder: '#f97316', impactText: '#9a3412',
+    impactHead: '⚠️ Eliminación en cascada — se borrarán también:',
+    impacts: [
+      'Observaciones Espectrales  (punto_id)',
+      'Registros de Monitoreo  (punto_id)',
+      '✓ El Área ACHA padre NO se elimina',
+    ],
+    tree: `📌 areas_acha  (area_id)  ← padre, NO se toca
+  └── 🗑 puntos_muestreo  ← este registro
+        ├── 🗑 observaciones_espectrales  (punto_id)
+        └── 🗑 registros_monitoreo  (punto_id)`,
+    btnColor: '#ea580c', btnLabel: 'Sí, eliminar todo'
+  },
+  observaciones: {
+    role: 'TABLA HIJA — registro hoja', isParent: false,
+    label: 'Observación Espectral',
+    impactBg: '#f0fdf4', impactBorder: '#22c55e', impactText: '#14532d',
+    impactHead: '✅ Solo se elimina este registro — sus padres NO se tocan:',
+    impacts: [
+      'puntos_muestreo  (punto_id)  →  se conserva',
+      'catalogo_imagenes  (imagen_id)  →  se conserva',
+      'catalogo_biomas  (clase_id)  →  se conserva',
+    ],
+    tree: `📌 puntos_muestreo  (punto_id)     ← padre, NO se toca
+📌 catalogo_imagenes  (imagen_id)  ← padre, NO se toca
+📌 catalogo_biomas  (clase_id)     ← padre, NO se toca
+  └── 🗑 observaciones_espectrales  ← SOLO este registro`,
+    btnColor: '#16a34a', btnLabel: 'Sí, eliminar'
+  },
+  registros: {
+    role: 'TABLA HIJA — registro hoja', isParent: false,
+    label: 'Registro de Monitoreo',
+    impactBg: '#f0fdf4', impactBorder: '#22c55e', impactText: '#14532d',
+    impactHead: '✅ Solo se elimina este registro — sus padres NO se tocan:',
+    impacts: [
+      'especies  (especie_id)  →  se conserva',
+      'puntos_muestreo  (punto_id)  →  se conserva',
+    ],
+    tree: `📌 especies  (especie_id)         ← padre, NO se toca
+📌 puntos_muestreo  (punto_id)  ← padre, NO se toca
+  └── 🗑 registros_monitoreo  ← SOLO este registro`,
+    btnColor: '#16a34a', btnLabel: 'Sí, eliminar'
+  },
+};
+
+let delPendingView = null;
+let delPendingId   = null;
+
+function deleteRecord(view, id) {
+  delPendingView = view;
+  delPendingId   = id;
+  const info = DEL_INFO[view];
+
+  // Header
+  document.getElementById('del-title').textContent = `Eliminar ${info.label} — ID: ${id}`;
+  document.getElementById('del-role').textContent  = info.role;
+
+  // Icon
+  const icon = document.getElementById('del-icon');
+  icon.style.background = info.isParent ? '#fef2f2' : '#f0fdf4';
+  icon.innerHTML = info.isParent
+    ? '<i class="fa-solid fa-triangle-exclamation" style="color:#ef4444"></i>'
+    : '<i class="fa-solid fa-circle-info" style="color:#16a34a"></i>';
+
+  // Impact panel
+  const panel = document.getElementById('del-impact');
+  panel.style.background  = info.impactBg;
+  panel.style.borderColor = info.impactBorder;
+  document.getElementById('del-impact-head').style.color   = info.impactText;
+  document.getElementById('del-impact-head').textContent   = info.impactHead;
+  document.getElementById('del-impact-list').innerHTML =
+    info.impacts.map(i => `<li>${i}</li>`).join('');
+
+  // Tree
+  document.getElementById('del-tree').textContent = info.tree;
+
+  // Button
+  document.getElementById('del-confirm-btn').style.background = info.btnColor;
+  document.getElementById('del-confirm-label').textContent    = info.btnLabel;
+
+  // Show overlay
+  const ov = document.getElementById('del-overlay');
+  ov.style.display = 'flex';
+  ov.onclick = (e) => { if (e.target === ov) delClose(); };
+}
+
+function delClose() {
+  document.getElementById('del-overlay').style.display = 'none';
+  delPendingView = null;
+  delPendingId   = null;
+}
+
+async function delConfirm() {
+  const view = delPendingView;
+  const id   = delPendingId;
+  if (!view || id === null) return;
+  delClose();
   try {
     const res = await fetch(`${API}${VIEWS[view].endpoint}/${id}`, { method: 'DELETE' });
     if (res.ok || res.status === 204) {
@@ -527,5 +673,41 @@ function showToast(msg, isError=false) {
 // ── INIT ──────────────────────────────────────────────────────────────────────
 window.onload = () => switchView('areas');
 </script>
+
+<!-- DELETE WARNING MODAL -->
+<div id="del-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fffef9;border-radius:12px;width:460px;max-width:96vw;box-shadow:0 24px 60px rgba(0,0,0,0.3);overflow:hidden;font-family:'DM Mono',monospace;">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:14px;padding:20px 22px 16px;border-bottom:1px solid #d4cfc5;">
+      <div id="del-icon" style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;"></div>
+      <div>
+        <p id="del-title" style="font-size:14px;font-weight:700;color:#1e1e1e;margin:0;"></p>
+        <p id="del-role"  style="font-size:11px;color:#6b7280;margin:3px 0 0;font-weight:500;letter-spacing:.5px;text-transform:uppercase;"></p>
+      </div>
+    </div>
+    <!-- Body -->
+    <div style="padding:18px 22px;">
+      <!-- Impact panel -->
+      <div id="del-impact" style="border-radius:8px;border-left:4px solid;padding:12px 14px;margin-bottom:14px;">
+        <p id="del-impact-head" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;"></p>
+        <ul id="del-impact-list" style="margin:0;padding-left:18px;font-size:12px;line-height:1.8;"></ul>
+      </div>
+      <!-- Dependency tree -->
+      <div style="background:#f5f2eb;border:1px solid #d4cfc5;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+        <p style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px;">Estructura de dependencias SQL</p>
+        <pre id="del-tree" style="font-family:'Courier New',monospace;font-size:12px;line-height:1.9;color:#374151;margin:0;white-space:pre-wrap;"></pre>
+      </div>
+      <p style="font-size:11px;color:#9ca3af;margin:0;">Esta acción <strong>no se puede deshacer</strong>.</p>
+    </div>
+    <!-- Footer -->
+    <div style="display:flex;justify-content:flex-end;gap:10px;padding:14px 22px;border-top:1px solid #d4cfc5;background:#f5f2eb;">
+      <button onclick="delClose()" style="padding:8px 16px;border-radius:6px;border:1px solid #d4cfc5;background:#fff;color:#374151;font-size:12px;font-weight:500;cursor:pointer;">Cancelar</button>
+      <button id="del-confirm-btn" onclick="delConfirm()" style="padding:8px 18px;border-radius:6px;border:none;color:#fff;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <i class="fa-solid fa-trash"></i><span id="del-confirm-label"></span>
+      </button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
