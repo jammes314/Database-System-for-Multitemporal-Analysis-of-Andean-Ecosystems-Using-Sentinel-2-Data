@@ -3,3 +3,4 @@ __pycache__/
 .env
 mysql_data/
 api.log
+Images/*.png

@@ -21,3 +21,11 @@ Open your terminal or command prompt and download the project:
 ```bash
 git clone [https://github.com/jammes314/Database-System-for-Multitemporal-Analysis-of-Andean-Ecosystems-Using-Sentinel-2-Data.git](https://github.com/jammes314/Database-System-for-Multitemporal-Analysis-of-Andean-Ecosystems-Using-Sentinel-2-Data.git)
 cd Database-System-for-Multitemporal-Analysis-of-Andean-Ecosystems-Using-Sentinel-2-Data
+## Images folder
+
+The project uses a local folder named `Images` to display PNG images in the interface.
+
+The folder must be located at:
+
+```txt
+/home/jammes/Desktop/dbFinalProject/Images 

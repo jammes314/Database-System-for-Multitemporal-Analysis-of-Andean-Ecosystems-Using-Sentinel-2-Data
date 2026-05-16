@@ -211,7 +211,7 @@
     <div id="view-registros" class="view-section">
       <div class="table-card">
         <table><thead><tr>
-          <th>ID</th><th>Especie</th><th>Punto</th><th>Fecha</th><th>Cantidad</th><th>Notas Hábitat</th><th style="text-align:right">Acciones</th>
+          <th>ID</th><th>Especie</th><th>Punto</th><th>Fecha</th><th>Cantidad</th><th>Notas Hábitat</th><th style="text-align:right">Imagen / Acciones</th>
         </tr></thead><tbody id="tb-registros"></tbody></table>
       </div>
     </div>
@@ -374,8 +374,39 @@ function renderRow(view, r) {
     <td>${uicnTag(r.estado_uicn)}</td>${actionBtns(view,r.id)}</tr>`;
 
   if (view==='imagenes') return `<tr>
-    <td style="font-size:11px">${r.id_producto}</td><td>${fmtDate(r.fecha_adquisicion)}</td>
-    <td>${r.porcentaje_nubes??0}%</td><td>${r.sensor??'—'}</td>${actionBtns(view,r.id_producto)}</tr>`;
+    <td style="font-size:11px;cursor:pointer;color:var(--accent);font-weight:700" onclick="toggleImage('${esc(r.id_producto)}', event)" title="Clic para ver/ocultar imagen">
+      ${r.id_producto} <span id="img-toggle-${r.id_producto}" style="font-size:10px;color:var(--muted);font-weight:400">🖼 Ver</span>
+    </td>
+    <td>${fmtDate(r.fecha_adquisicion)}</td>
+    <td>${r.porcentaje_nubes??0}%</td><td>${r.sensor??'—'}</td>${actionBtns(view,r.id_producto)}</tr>
+  <tr id="img-row-${r.id_producto}" style="display:none;background:#f5f2eb;">
+    <td colspan="5" style="padding:0">
+      <div style="padding:16px 20px;display:flex;align-items:flex-start;gap:20px;border-bottom:2px solid var(--border);">
+        <div style="flex-shrink:0">
+          <p style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">
+            Imagen del producto ${r.id_producto}
+          </p>
+          <img id="img-el-${r.id_producto}" src="" alt="Imagen ${r.id_producto}"
+            style="max-width:520px;max-height:340px;border-radius:8px;border:1px solid var(--border);object-fit:contain;background:#fff;display:none">
+          <div id="img-err-${r.id_producto}" style="display:none;padding:20px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b;font-size:12px;max-width:420px">
+            <i class="fa-solid fa-image-slash"></i>
+            No se encontró imagen para <strong>${r.id_producto}</strong><br>
+            <span style="font-size:10px;color:#b91c1c">Ruta esperada: /home/jammes/Desktop/dbFinalProject/Images/${r.id_producto}.png</span>
+          </div>
+          <div id="img-loading-${r.id_producto}" style="padding:20px;color:var(--muted);font-size:12px">
+            <i class="fa-solid fa-spinner fa-spin"></i> Cargando imagen...
+          </div>
+        </div>
+        <div style="font-size:12px;line-height:1.8;color:var(--text)">
+          <p style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">Datos de la imagen</p>
+          <p><strong>ID Producto:</strong> ${r.id_producto}</p>
+          <p><strong>Fecha:</strong> ${fmtDate(r.fecha_adquisicion)}</p>
+          <p><strong>% Nubes:</strong> ${r.porcentaje_nubes??0}%</p>
+          <p><strong>Sensor:</strong> ${r.sensor??'—'}</p>
+        </div>
+      </div>
+    </td>
+  </tr>`;
 
   if (view==='puntos') return `<tr>
     <td>${r.id}</td><td>${r.area_id??'—'}</td><td>${r.latitud}</td><td>${r.longitud}</td>
@@ -387,10 +418,46 @@ function renderRow(view, r) {
     <td>${r.ndvi??'—'}</td><td>${r.ndmi??'—'}</td><td>${r.bsi??'—'}</td>
     <td>${r.clase_id??'—'}</td><td>${r.confianza_prediccion??'—'}%</td>${actionBtns(view,r.id)}</tr>`;
 
-  if (view==='registros') return `<tr>
+  if (view==='registros') return `<tr style="cursor:pointer" onclick="toggleImage(${r.id}, event)">
     <td>${r.id}</td><td>Esp.${r.especie_id??'—'}</td><td>Pt.${r.punto_id??'—'}</td>
     <td>${fmtDT(r.fecha_observacion)}</td><td>${r.cantidad??'—'}</td>
-    <td class="truncate-cell">${r.notas_habitat??'—'}</td>${actionBtns(view,r.id)}</tr>`;
+    <td class="truncate-cell">${r.notas_habitat??'—'}</td>
+    <td class="actions" style="white-space:nowrap">
+      <span style="font-size:10px;color:var(--muted);margin-right:6px" id="img-toggle-${r.id}">🖼 Ver imagen</span>
+      <button class="act-btn edit" onclick="openEdit('registros','${r.id}');event.stopPropagation()" title="Editar"><i class="fa-solid fa-pen"></i></button>
+      <button class="act-btn del"  onclick="deleteRecord('registros','${r.id}');event.stopPropagation()" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+    </td>
+  </tr>
+  <tr id="img-row-${r.id}" style="display:none;background:#f5f2eb;">
+    <td colspan="7" style="padding:0">
+      <div style="padding:16px 20px;display:flex;align-items:flex-start;gap:20px;border-bottom:2px solid var(--border);">
+        <div style="flex-shrink:0">
+          <p style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">
+            Imagen del Registro #${r.id}
+          </p>
+          <img id="img-el-${r.id}" src="" alt="Imagen registro ${r.id}"
+            style="max-width:420px;max-height:300px;border-radius:8px;border:1px solid var(--border);object-fit:contain;background:#fff;display:none"
+            onerror="document.getElementById('img-err-${r.id}').style.display='block';this.style.display='none'">
+          <div id="img-err-${r.id}" style="display:none;padding:20px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b;font-size:12px;max-width:320px">
+            <i class="fa-solid fa-image-slash"></i>
+            No se encontró imagen para el registro <strong>#${r.id}</strong><br>
+            <span style="font-size:10px;color:#b91c1c">Ruta esperada: /home/jammes/Desktop/dbFinalProject/Images/${r.id}.png</span>
+          </div>
+          <div id="img-loading-${r.id}" style="padding:20px;color:var(--muted);font-size:12px">
+            <i class="fa-solid fa-spinner fa-spin"></i> Cargando imagen...
+          </div>
+        </div>
+        <div style="font-size:12px;line-height:1.8;color:var(--text)">
+          <p style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">Datos del registro</p>
+          <p><strong>Especie ID:</strong> ${r.especie_id??'—'}</p>
+          <p><strong>Punto ID:</strong> ${r.punto_id??'—'}</p>
+          <p><strong>Fecha:</strong> ${fmtDT(r.fecha_observacion)}</p>
+          <p><strong>Cantidad:</strong> ${r.cantidad??'—'}</p>
+          <p style="max-width:280px"><strong>Notas:</strong> ${r.notas_habitat??'—'}</p>
+        </div>
+      </div>
+    </td>
+  </tr>`;
 
   return '';
 }
@@ -647,6 +714,50 @@ async function delConfirm() {
   } catch(e) { showToast('Error de red', true); }
 }
 
+// ── IMAGE VIEWER ─────────────────────────────────────────────────────────────
+const openImageRows = new Set();  // track which rows are expanded
+
+function toggleImage(id, event) {
+  if (event) event.stopPropagation();
+
+  const row     = document.getElementById(`img-row-${id}`);
+  const toggle  = document.getElementById(`img-toggle-${id}`);
+  const imgEl   = document.getElementById(`img-el-${id}`);
+  const errEl   = document.getElementById(`img-err-${id}`);
+  const loading = document.getElementById(`img-loading-${id}`);
+
+  if (!row || !imgEl || !errEl || !loading) return;
+
+  if (openImageRows.has(id)) {
+    row.style.display = 'none';
+    if (toggle) toggle.textContent = currentView === 'imagenes' ? '🖼 Ver' : '🖼 Ver imagen';
+    openImageRows.delete(id);
+    return;
+  }
+
+  row.style.display = 'table-row';
+  if (toggle) toggle.textContent = '▲ Ocultar';
+  openImageRows.add(id);
+
+  imgEl.style.display = 'none';
+  errEl.style.display = 'none';
+  loading.style.display = 'block';
+
+  imgEl.onload = () => {
+    loading.style.display = 'none';
+    imgEl.style.display = 'block';
+  };
+
+  imgEl.onerror = () => {
+    loading.style.display = 'none';
+    errEl.style.display = 'block';
+    imgEl.style.display = 'none';
+  };
+
+  // FastAPI serves /images/{id}. The PNG file must be named exactly like the row id.
+  imgEl.src = `${API}/images/${encodeURIComponent(id)}?t=${Date.now()}`;
+}
+
 // ── SEED ──────────────────────────────────────────────────────────────────────
 async function seedDB() {
   if (!confirm('¿Cargar datos de demostración en todas las tablas?\n(Los duplicados se omiten automáticamente.)')) return;
@@ -655,7 +766,7 @@ async function seedDB() {
     const res = await fetch(`${API}/seed`, { method: 'POST' });
     const data = await res.json();
     const counts = Object.entries(data.inserted).map(([k,v])=>`${k}: ${v}`).join(' | ');
-    showToast(`✓ Seed completo — ${counts}`);
+    showToast(`✓ Seed completo (upserted) — ${counts}`);
     fetchData(currentView);
   } catch(e) { showToast('Error ejecutando seed', true); }
 }

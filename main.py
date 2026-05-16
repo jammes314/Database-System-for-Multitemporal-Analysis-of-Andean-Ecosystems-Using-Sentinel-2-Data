@@ -65,6 +65,33 @@ def root():
     return {"status": "ok", "api": "Eco Monitoring API v2.0", "tables": 7}
 
 
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  IMAGE SERVER — serves PNG files from local images folder
+# ══════════════════════════════════════════════════════════════════════════════
+
+from fastapi.responses import FileResponse
+
+IMAGES_DIR = os.getenv("IMAGES_DIR", "/home/jammes/Desktop/dbFinalProject/Images")
+
+@app.get("/images/{image_id}", tags=["Images"])
+def get_image(image_id: str):
+    """Serve a PNG image by ID (filename without extension)."""
+    path = os.path.join(IMAGES_DIR, f"{image_id}.png")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail=f"Image '{image_id}.png' not found in {IMAGES_DIR}")
+    return FileResponse(path, media_type="image/png")
+
+@app.get("/images", tags=["Images"])
+def list_images():
+    """List all available PNG image IDs in the images folder."""
+    if not os.path.isdir(IMAGES_DIR):
+        return {"images": [], "path": IMAGES_DIR, "error": "Directory not found"}
+    ids = [f[:-4] for f in os.listdir(IMAGES_DIR) if f.endswith('.png')]
+    ids.sort()
+    return {"images": ids, "count": len(ids), "path": IMAGES_DIR}
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  SEED  — loads rich demo data into all 7 tables in dependency order
 # ══════════════════════════════════════════════════════════════════════════════
@@ -183,24 +210,47 @@ def seed_data():
     cursor = conn.cursor()
     counts = {t: 0 for t in ["areas_acha","catalogo_biomas","especies","catalogo_imagenes","puntos_muestreo","observaciones_espectrales","registros_monitoreo"]}
 
-    def safe_insert(sql, rows, table):
+    def upsert(sql, rows, table):
+        """INSERT ... ON DUPLICATE KEY UPDATE — inserts new rows, updates existing ones."""
         for row in rows:
-            try:
-                cursor.execute(sql, row)
-                counts[table] += 1
-            except Error as e:
-                if e.errno != 1062: raise
+            cursor.execute(sql, row)   # ON DUPLICATE KEY UPDATE uses VALUES(...), so only one parameter set is needed
+            counts[table] += 1
 
     try:
-        safe_insert("INSERT INTO areas_acha (id,nombre,geometria_poligonal,prioridad_muestreo) VALUES (%s,%s,%s,%s)", areas, "areas_acha")
-        safe_insert("INSERT INTO catalogo_biomas (id,nombre_clase,descripcion_ecologica) VALUES (%s,%s,%s)", biomas, "catalogo_biomas")
-        safe_insert("INSERT INTO especies (id,nombre_cientifico,estado_uicn) VALUES (%s,%s,%s)", especies, "especies")
-        safe_insert("INSERT INTO catalogo_imagenes (id_producto,fecha_adquisicion,porcentaje_nubes,sensor) VALUES (%s,%s,%s,%s)", imagenes, "catalogo_imagenes")
-        safe_insert("INSERT INTO puntos_muestreo (id,area_id,latitud,longitud,altitud,pixel_id_hash) VALUES (%s,%s,%s,%s,%s,%s)", puntos, "puntos_muestreo")
-        safe_insert("INSERT INTO observaciones_espectrales (punto_id,imagen_id,b2_blue,b3_green,b4_red,b8_nir,b11_swir1,b12_swir2,ndvi,ndmi,bsi,clase_id,es_verdad_campo,confianza_prediccion) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", observaciones, "observaciones_espectrales")
-        safe_insert("INSERT INTO registros_monitoreo (especie_id,punto_id,fecha_observacion,cantidad,notas_habitat) VALUES (%s,%s,%s,%s,%s)", registros, "registros_monitoreo")
+        upsert("""INSERT INTO areas_acha (id,nombre,geometria_poligonal,prioridad_muestreo) VALUES (%s,%s,%s,%s)
+                  ON DUPLICATE KEY UPDATE nombre=VALUES(nombre), geometria_poligonal=VALUES(geometria_poligonal), prioridad_muestreo=VALUES(prioridad_muestreo)""",
+               areas, "areas_acha")
+        upsert("""INSERT INTO catalogo_biomas (id,nombre_clase,descripcion_ecologica) VALUES (%s,%s,%s)
+                  ON DUPLICATE KEY UPDATE nombre_clase=VALUES(nombre_clase), descripcion_ecologica=VALUES(descripcion_ecologica)""",
+               biomas, "catalogo_biomas")
+        upsert("""INSERT INTO especies (id,nombre_cientifico,estado_uicn) VALUES (%s,%s,%s)
+                  ON DUPLICATE KEY UPDATE nombre_cientifico=VALUES(nombre_cientifico), estado_uicn=VALUES(estado_uicn)""",
+               especies, "especies")
+        upsert("""INSERT INTO catalogo_imagenes (id_producto,fecha_adquisicion,porcentaje_nubes,sensor) VALUES (%s,%s,%s,%s)
+                  ON DUPLICATE KEY UPDATE fecha_adquisicion=VALUES(fecha_adquisicion), porcentaje_nubes=VALUES(porcentaje_nubes), sensor=VALUES(sensor)""",
+               imagenes, "catalogo_imagenes")
+        upsert("""INSERT INTO puntos_muestreo (id,area_id,latitud,longitud,altitud,pixel_id_hash) VALUES (%s,%s,%s,%s,%s,%s)
+                  ON DUPLICATE KEY UPDATE area_id=VALUES(area_id), latitud=VALUES(latitud), longitud=VALUES(longitud), altitud=VALUES(altitud), pixel_id_hash=VALUES(pixel_id_hash)""",
+               puntos, "puntos_muestreo")
+        # observaciones uses AUTO_INCREMENT — use REPLACE to avoid duplicates on re-seed
+        # We truncate and re-insert to keep data clean on every seed call
+        cursor.execute("DELETE FROM registros_monitoreo")
+        cursor.execute("DELETE FROM observaciones_espectrales")
+        # Reset AUTO_INCREMENT so seeded register IDs match image filenames: 1.png, 2.png, ...
+        cursor.execute("ALTER TABLE observaciones_espectrales AUTO_INCREMENT = 1")
+        cursor.execute("ALTER TABLE registros_monitoreo AUTO_INCREMENT = 1")
+        for row in observaciones:
+            cursor.execute("""INSERT INTO observaciones_espectrales
+                (punto_id,imagen_id,b2_blue,b3_green,b4_red,b8_nir,b11_swir1,b12_swir2,ndvi,ndmi,bsi,clase_id,es_verdad_campo,confianza_prediccion)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", row)
+            counts["observaciones_espectrales"] += 1
+        for row in registros:
+            cursor.execute("""INSERT INTO registros_monitoreo
+                (especie_id,punto_id,fecha_observacion,cantidad,notas_habitat)
+                VALUES (%s,%s,%s,%s,%s)""", row)
+            counts["registros_monitoreo"] += 1
         conn.commit()
-        return {"message": "Seed complete (duplicates skipped)", "inserted": counts}
+        return {"message": "Seed complete (upserted — all data refreshed)", "inserted": counts}
     except Error as e:
         conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
